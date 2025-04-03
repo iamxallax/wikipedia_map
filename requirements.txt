@@ -1,3 +1,5 @@
 wikipedia-api
-dash
-dash_cytoscape
+networkx
+matplotlib
+scipy
+pyvis

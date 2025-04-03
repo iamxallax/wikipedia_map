@@ -34,19 +34,8 @@ def add_links_entry(name:str, related_items:list, database):
     cursor.close()
 
 
-def main():
+def get_list():
     wiki_wiki = wikipediaapi.Wikipedia(user_agent='MyProjectName (merlin@example.com)', language='en')
-
-    url = "https://en.wikipedia.org/wiki/Python_(programming_language)"
-    title = url.split('/wiki/')[-1]
-
-    page = wiki_wiki.page(title)
-
-    if page.exists():
-        print(f"Title: {page.title}")
-        print(get_links(page))
-    else:
-        print("Page does not exist.")
     
     database = sqlite3.connect('links.db')
 
@@ -72,24 +61,30 @@ def main():
 
     database.commit()
 
-    add_links_entry('Python_(programming_language)', get_links(page), database)
-
-    cursor.execute('SELECT * FROM related_links')
-    raw_list = cursor.fetchall()
-
-
     compiled_list = []
+
+    for i in range(1000):
+        cursor.execute('SELECT * FROM related_links')
+        raw_list = cursor.fetchall()
+        try:
+            name = cursor.execute('SELECT name FROM Links WHERE id = ?', (raw_list[-1][2],)).fetchone()[0]
+        except IndexError:
+            print('INDEX ERROR')
+            name = 'Python_(programming_language)'
+        page = wiki_wiki.page(name)
+        add_links_entry(name, get_links(page), database)
+        
+    
     for tup in raw_list:
         compiled_list.append(
             (
-                (tup[1], cursor.execute('SELECT name FROM Links WHERE id = ?', (tup[1],)).fetchone()[0]),
-                (tup[2], cursor.execute('SELECT name FROM Links WHERE id = ?', (tup[2],)).fetchone()[0])
+                (cursor.execute('SELECT name FROM Links WHERE id = ?', (tup[1],)).fetchone()[0]),
+                (cursor.execute('SELECT name FROM Links WHERE id = ?', (tup[2],)).fetchone()[0])
             )
         )
 
     cursor.close()
     database.close()
-    
-    
+
     return compiled_list
                                                         

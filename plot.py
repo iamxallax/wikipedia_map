@@ -1,32 +1,67 @@
-from dash import Dash, html
-import dash_cytoscape as cyto
-
-from main import main
-
-app = Dash(__name__)
+import networkx as nx
+from pyvis.network import Network
+import os
+import sqlite3
+from get_data import get_list
+import webbrowser
+import math
 
 def create_graph(connections:list):
-    elements = [{'data': {'id': '1', 'label': '1'}}]
+    G = nx.Graph()
     
-    for tup in connections[:100]:
-        home_id, home_name = str(tup[0][0]), tup[0][1]
-        branch_id, branch_name = str(tup[1][0]), tup[1][1]
-        if not any(d.get('data', {}).get('id') == branch_id for d in elements):
-            elements.append({'data': {'id': branch_id, 'label': branch_name}})
-        elements.append({'data': {'source': home_id, 'target': branch_id}})
+    # Create the NetworkX graph
+    for tup in connections:
+        home_name = tup[0]
+        branch_name = tup[1]
+        if not home_name in G.nodes:
+            G.add_node(home_name)
+        if not branch_name in G.nodes:
+            G.add_node(branch_name)
+        G.add_edge(home_name, branch_name)
+    
+    # Create a Pyvis Network
+    net = Network(notebook=True, height='750px', width='100%')
+    net.from_nx(G)
 
-    print(elements)
+    # Calculate degrees and scale node sizes logarithmically
+    degrees = dict(G.degree())
+    for node in net.nodes:
+        degree = degrees[node['id']]
+        node['size'] = math.log(degree + 1) * 10  # Adjust multiplier for desired scaling
+        node['label'] = ''
+        node['title'] = node['id']
+    
+    # Set options with modified physics settings for spreading nodes
+    net.set_options('''
+    var options = {
+      "configure": {
+        "enabled": true,
+        "filter": "nodes, physics"
+      },
+      "interaction": {
+        "hover": true
+      },
+      "physics": {
+        "enabled": true,
+        "barnesHut": {
+          "gravitationalConstant": -2000,
+          "centralGravity": 0.3,
+          "springLength": 200,
+          "springConstant": 0.04,
+          "damping": 0.09
+        }
+      }
+    }
+    ''')
 
-    app.layout = html.Div([
-        html.P("Dash Cytoscape:"),
-        cyto.Cytoscape(
-            id='cytoscape',
-            elements=elements,
-            layout={'name': 'breadthfirst'},
-            style={'width': '2000px', 'height': '1000px'}
-        )
-    ])
+    # Display the network
+    net.show('network.html')
 
-    app.run(debug=True)
+    # Cleanup
+    os.remove('links.db')
 
-create_graph(main())
+# Execute the function to create the graph from your data
+create_graph(get_list())
+
+# Open the result in a web browser
+webbrowser.open('network.html')
