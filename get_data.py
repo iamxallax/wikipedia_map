@@ -1,5 +1,7 @@
 import wikipediaapi
 import sqlite3
+import os
+import sys
 
 def get_links(page):
     links = page.links
@@ -34,7 +36,10 @@ def add_links_entry(name:str, related_items:list, database):
     cursor.close()
 
 
-def get_list():
+def get_list(category):
+    os.remove('links.db')
+
+
     wiki_wiki = wikipediaapi.Wikipedia(user_agent='MyProjectName (merlin@example.com)', language='en')
     
     database = sqlite3.connect('links.db')
@@ -59,22 +64,44 @@ def get_list():
     ''')
 
 
+
     database.commit()
+
+    # for i in range(1000):
+    #     cursor.execute('SELECT * FROM related_links')
+    #     raw_list = cursor.fetchall()
+    #     try:
+    #         name = cursor.execute('SELECT name FROM Links WHERE id = ?', (raw_list[-1][2],)).fetchone()[0]
+    #     except IndexError:
+    #         print('INDEX ERROR')
+    #         name = 'Python_(programming_language)'
+    #     page = wiki_wiki.page(name)
+    #     add_links_entry(name, get_links(page), database)
+
+    category = category.replace(' ', '_')
+
+    start = wiki_wiki.page(category)
+
+    keys = start.categorymembers.keys()
+    keys = [page for page in keys if not page.startswith('Category:')]
+    
+    for name in keys:
+        add_links_entry(name, get_links(wiki_wiki.page(name)), database)
+
+        
+    cursor.close()
+    database.close()
+
+def get_clean_info():
+    database = sqlite3.connect('links.db')
+
+    cursor = database.cursor()
+
+    cursor.execute('SELECT * FROM related_links')
+    raw_list = cursor.fetchall()
 
     compiled_list = []
 
-    for i in range(1000):
-        cursor.execute('SELECT * FROM related_links')
-        raw_list = cursor.fetchall()
-        try:
-            name = cursor.execute('SELECT name FROM Links WHERE id = ?', (raw_list[-1][2],)).fetchone()[0]
-        except IndexError:
-            print('INDEX ERROR')
-            name = 'Python_(programming_language)'
-        page = wiki_wiki.page(name)
-        add_links_entry(name, get_links(page), database)
-        
-    
     for tup in raw_list:
         compiled_list.append(
             (
@@ -82,9 +109,9 @@ def get_list():
                 (cursor.execute('SELECT name FROM Links WHERE id = ?', (tup[2],)).fetchone()[0])
             )
         )
-
-    cursor.close()
-    database.close()
-
+    
     return compiled_list
-                                                        
+
+
+if __name__ == '__main__':
+    get_list(sys.argv[1])
